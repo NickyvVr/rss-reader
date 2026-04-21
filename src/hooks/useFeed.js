@@ -1,38 +1,62 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { parseRSSOrAtom } from '../utils/rssParser';
 
-const CONCURRENCY = 5;
+const CONCURRENCY = 3;
+const TIMEOUT_MS = 25000;
+const BATCH_DELAY_MS = 300;
 
 function buildProxyUrl(feedUrl, proxy) {
   if (proxy === 'allorigins') {
     return `https://api.allorigins.win/get?url=${encodeURIComponent(feedUrl)}`;
   }
-  // rss2json (default)
   return `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}`;
 }
 
-async function fetchFeedRaw(feedUrl, proxy) {
-  const proxyUrl = buildProxyUrl(feedUrl, proxy);
-  const response = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
-
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-  if (proxy === 'allorigins') {
-    const json = await response.json();
-    if (!json.contents) throw new Error('Empty response from allorigins');
-    return json.contents;
-  }
-
-  // rss2json returns JSON with items array - but we parse the raw feed ourselves
-  // Actually rss2json returns JSON, not raw XML. Use allorigins-style raw parsing
-  // For rss2json we need to hit the raw endpoint differently.
-  // rss2json returns structured JSON, so let's parse that instead.
-  const json = await response.json();
-  if (json.status !== 'ok') throw new Error(json.message || 'rss2json error');
-  return { rss2jsonData: json };
+function friendlyError(err) {
+  if (err.name === 'TimeoutError' || err.name === 'AbortError') return 'Timed out';
+  const msg = err.message || '';
+  if (msg.includes('429') || msg.toLowerCase().includes('limit')) return 'Rate limited';
+  if (msg.startsWith('HTTP ')) return `Server error (${msg.replace('HTTP ', '')})`;
+  return msg || 'Fetch failed';
 }
 
-function rss2jsonToArticles(data, sourceId, sourceFallbackTitle) {
+async function fetchFeedRaw(feedUrl, proxy) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), TIMEOUT_MS);
+
+  try {
+    const proxyUrl = buildProxyUrl(feedUrl, proxy);
+    const response = await fetch(proxyUrl, { signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    if (proxy === 'allorigins') {
+      const json = await response.json();
+      if (!json.contents) throw new Error('Empty response');
+      return json.contents;
+    }
+
+    const json = await response.json();
+    if (json.status !== 'ok') throw new Error(json.message || 'rss2json error');
+    return { rss2jsonData: json };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// One retry with a short back-off on timeout/network errors
+async function fetchFeedWithRetry(feedUrl, proxy) {
+  try {
+    return await fetchFeedRaw(feedUrl, proxy);
+  } catch (err) {
+    if (err.name === 'TimeoutError' || err.name === 'AbortError' || err.message === 'Failed to fetch') {
+      await new Promise(r => setTimeout(r, 1500));
+      return fetchFeedRaw(feedUrl, proxy);
+    }
+    throw err;
+  }
+}
+
+function rss2jsonToArticles(data, sourceFallbackTitle) {
   const feed = data.rss2jsonData;
   return (feed.items || []).map(item => {
     const author = item.author || sourceFallbackTitle || '';
@@ -59,53 +83,45 @@ export function useFeed({ proxy = 'rss2json', onMergeArticles, onSourceError, on
   const [fetching, setFetching] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState(null);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
-  const abortRef = useRef(null);
 
   const fetchSource = useCallback(async (source) => {
     try {
-      const raw = await fetchFeedRaw(source.xmlUrl, proxy);
-
-      let articles;
-      if (raw && raw.rss2jsonData) {
-        articles = rss2jsonToArticles(raw, source.id, source.title);
-      } else {
-        articles = parseRSSOrAtom(raw, source.id, source.title);
-      }
-
-      const count = onMergeArticles(source.id, articles);
+      const raw = await fetchFeedWithRetry(source.xmlUrl, proxy);
+      const articles = raw?.rss2jsonData
+        ? rss2jsonToArticles(raw, source.title)
+        : parseRSSOrAtom(raw, source.id, source.title);
+      onMergeArticles(source.id, articles);
       onSourceFetched(source.id);
-      return { sourceId: source.id, count, error: null };
+      return { sourceId: source.id, error: null };
     } catch (err) {
-      onSourceError(source.id, err.message);
-      return { sourceId: source.id, count: 0, error: err.message };
+      const msg = friendlyError(err);
+      onSourceError(source.id, msg);
+      return { sourceId: source.id, error: msg };
     }
   }, [proxy, onMergeArticles, onSourceError, onSourceFetched]);
 
   const fetchAll = useCallback(async (sources) => {
-    const activeSources = sources.filter(s => s.active);
-    if (activeSources.length === 0) return;
+    const active = sources.filter(s => s.active);
+    if (active.length === 0) return;
 
     setFetching(true);
-    setProgress({ done: 0, total: activeSources.length });
+    setProgress({ done: 0, total: active.length });
 
-    // Process in batches of CONCURRENCY
-    const results = [];
-    for (let i = 0; i < activeSources.length; i += CONCURRENCY) {
-      const batch = activeSources.slice(i, i + CONCURRENCY);
-      const batchResults = await Promise.all(batch.map(s => fetchSource(s)));
-      results.push(...batchResults);
-      setProgress(p => ({ ...p, done: Math.min(p.done + batch.length, activeSources.length) }));
+    for (let i = 0; i < active.length; i += CONCURRENCY) {
+      const batch = active.slice(i, i + CONCURRENCY);
+      await Promise.all(batch.map(s => fetchSource(s)));
+      setProgress(p => ({ ...p, done: Math.min(p.done + batch.length, active.length) }));
+      if (i + CONCURRENCY < active.length) {
+        await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+      }
     }
 
     setFetching(false);
     setLastRefreshed(new Date());
-    return results;
   }, [fetchSource]);
 
   const fetchSingle = useCallback(async (source) => {
-    setFetching(true);
     const result = await fetchSource(source);
-    setFetching(false);
     setLastRefreshed(new Date());
     return result;
   }, [fetchSource]);

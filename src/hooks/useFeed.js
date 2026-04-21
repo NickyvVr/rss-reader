@@ -3,11 +3,16 @@ import { parseRSSOrAtom } from '../utils/rssParser';
 
 const CONCURRENCY = 3;
 const TIMEOUT_MS = 25000;
+const AUTO_TIMEOUT_MS = 10000;
 const BATCH_DELAY_MS = 300;
+const AUTO_PROXY_ORDER = ['rss2json', 'corsproxy', 'allorigins'];
 
 function buildProxyUrl(feedUrl, proxy) {
   if (proxy === 'allorigins') {
     return `https://api.allorigins.win/get?url=${encodeURIComponent(feedUrl)}`;
+  }
+  if (proxy === 'corsproxy') {
+    return `https://corsproxy.io/?${encodeURIComponent(feedUrl)}`;
   }
   return `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}`;
 }
@@ -20,9 +25,9 @@ function friendlyError(err) {
   return msg || 'Fetch failed';
 }
 
-async function fetchFeedRaw(feedUrl, proxy) {
+async function fetchFeedRaw(feedUrl, proxy, timeoutMs = TIMEOUT_MS) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), timeoutMs);
 
   try {
     const proxyUrl = buildProxyUrl(feedUrl, proxy);
@@ -35,6 +40,13 @@ async function fetchFeedRaw(feedUrl, proxy) {
       return json.contents;
     }
 
+    if (proxy === 'corsproxy') {
+      const text = await response.text();
+      if (!text || !text.trim()) throw new Error('Empty response');
+      return text;
+    }
+
+    // rss2json
     const json = await response.json();
     if (json.status !== 'ok') throw new Error(json.message || 'rss2json error');
     return { rss2jsonData: json };
@@ -43,8 +55,19 @@ async function fetchFeedRaw(feedUrl, proxy) {
   }
 }
 
-// One retry with a short back-off on timeout/network errors
 async function fetchFeedWithRetry(feedUrl, proxy) {
+  if (proxy === 'auto') {
+    let lastErr;
+    for (const p of AUTO_PROXY_ORDER) {
+      try {
+        return await fetchFeedRaw(feedUrl, p, AUTO_TIMEOUT_MS);
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    throw lastErr;
+  }
+
   try {
     return await fetchFeedRaw(feedUrl, proxy);
   } catch (err) {
@@ -121,7 +144,9 @@ export function useFeed({ proxy = 'rss2json', onMergeArticles, onSourceError, on
   }, [fetchSource]);
 
   const fetchSingle = useCallback(async (source) => {
+    setFetching(true);
     const result = await fetchSource(source);
+    setFetching(false);
     setLastRefreshed(new Date());
     return result;
   }, [fetchSource]);

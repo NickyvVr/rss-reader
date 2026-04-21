@@ -247,13 +247,20 @@ export default function App() {
             </div>
 
             {/* Status bar */}
-            <div className="text-xs text-gray-600 mb-3 h-4">
-              {fetching
-                ? `Fetching feeds… ${progress.done}/${progress.total}`
-                : lastRefreshed
-                  ? `Last refreshed ${formatDistanceToNow(lastRefreshed.toISOString())}`
-                  : null
-              }
+            <div className="text-xs mb-3 min-h-4">
+              {fetching ? (
+                <span className="text-gray-600">{`Fetching feeds… ${progress.done}/${progress.total}`}</span>
+              ) : (() => {
+                if (view.startsWith('source:')) {
+                  const src = sources.find(s => s.id === view.replace('source:', ''));
+                  if (src?.lastError) return <span className="text-red-400/80">Last fetch failed: {src.lastError}</span>;
+                  if (src?.lastFetchedAt) return <span className="text-gray-600">Fetched {formatDistanceToNow(src.lastFetchedAt)}</span>;
+                }
+                if (lastRefreshed) {
+                  return <span className="text-gray-600">{`Last refreshed ${formatDistanceToNow(lastRefreshed.toISOString())} · ${lastRefreshed.toLocaleTimeString()}`}</span>;
+                }
+                return null;
+              })()}
             </div>
 
             {/* OPML import prompt */}

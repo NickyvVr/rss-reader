@@ -6,7 +6,7 @@ const KEYS = {
 
 const DEFAULTS = {
   settings: {
-    corsProxy: 'rss2json',
+    corsProxy: 'auto',
     defaultView: 'unread',
     sourceSort: 'alpha',
     categoryOrder: [],

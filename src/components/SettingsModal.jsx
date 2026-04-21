@@ -69,8 +69,10 @@ export function SettingsModal({ settings, onSave, onClearArticles, sources, onCl
             <label className="block text-sm font-medium text-gray-300 mb-2">CORS Proxy</label>
             <div className="space-y-2">
               {[
+                { value: 'auto', label: 'Auto (recommended)', desc: 'Tries each proxy in turn. Best reliability.' },
                 { value: 'rss2json', label: 'rss2json.com', desc: 'Structured JSON API. Free tier: 10k req/day.' },
-                { value: 'allorigins', label: 'allorigins.win', desc: 'Returns raw XML. Unlimited but slower.' },
+                { value: 'corsproxy', label: 'corsproxy.io', desc: 'Transparent raw proxy. No known rate limit.' },
+                { value: 'allorigins', label: 'allorigins.win', desc: 'Raw XML via JSON wrapper. Unlimited but slower.' },
               ].map(opt => (
                 <label key={opt.value} className="flex items-start gap-3 cursor-pointer">
                   <input

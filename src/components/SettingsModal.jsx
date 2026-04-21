@@ -4,7 +4,6 @@ import { toast } from './Toast';
 
 export function SettingsModal({ settings, onSave, onClearArticles, sources, onClose }) {
   const [form, setForm] = useState({ ...settings });
-  const [showKey, setShowKey] = useState(false);
 
   function set(key, value) {
     setForm(f => ({ ...f, [key]: value }));
@@ -40,46 +39,6 @@ export function SettingsModal({ settings, onSave, onClearArticles, sources, onCl
         </div>
 
         <div className="p-6 space-y-6">
-          {/* API Key */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Anthropic API Key
-              <a
-                href="https://console.anthropic.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ml-2 text-indigo-400 hover:underline text-xs"
-              >
-                Get key →
-              </a>
-            </label>
-            <div className="relative">
-              <input
-                type={showKey ? 'text' : 'password'}
-                value={form.anthropicApiKey}
-                onChange={e => set('anthropicApiKey', e.target.value)}
-                placeholder="sk-ant-..."
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 pr-10"
-              />
-              <button
-                onClick={() => setShowKey(s => !s)}
-                className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-200"
-              >
-                {showKey ? (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                  </svg>
-                ) : (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                )}
-              </button>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">Stored in localStorage. Never sent to our servers.</p>
-          </div>
-
           {/* CORS Proxy */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">CORS Proxy</label>
@@ -117,21 +76,6 @@ export function SettingsModal({ settings, onSave, onClearArticles, sources, onCl
               <option value="unread">Unread</option>
               <option value="all">All Articles</option>
             </select>
-          </div>
-
-          {/* Auto mark read */}
-          <div>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <div
-                onClick={() => set('autoMarkReadOnExpand', !form.autoMarkReadOnExpand)}
-                className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer
-                  ${form.autoMarkReadOnExpand ? 'bg-indigo-600' : 'bg-gray-700'}`}
-              >
-                <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform
-                  ${form.autoMarkReadOnExpand ? 'translate-x-4' : ''}`} />
-              </div>
-              <span className="text-sm text-gray-300">Auto-mark as read when expanding a card</span>
-            </label>
           </div>
 
           {/* Data management */}

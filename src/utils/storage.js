@@ -6,10 +6,8 @@ const KEYS = {
 
 const DEFAULTS = {
   settings: {
-    anthropicApiKey: '',
     corsProxy: 'rss2json',
     defaultView: 'unread',
-    autoMarkReadOnExpand: false,
   },
 };
 

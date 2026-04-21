@@ -28,6 +28,7 @@ export function SourcesManager({
   const [deleteId, setDeleteId] = useState(null);
   const [keepArticles, setKeepArticles] = useState(false);
   const [editName, setEditName] = useState('');
+  const [editUrl, setEditUrl] = useState('');
   const [editCat, setEditCat] = useState('');
   const [renameCat, setRenameCat] = useState(null);
   const [renameTo, setRenameTo] = useState('');
@@ -69,11 +70,12 @@ export function SourcesManager({
   function startEdit(source) {
     setEditId(source.id);
     setEditName(source.title);
+    setEditUrl(source.xmlUrl);
     setEditCat(source.category || '');
   }
 
   function saveEdit(id) {
-    onUpdateSource(id, { title: editName, category: editCat });
+    onUpdateSource(id, { title: editName, xmlUrl: editUrl.trim(), category: editCat });
     setEditId(null);
     toast('Source updated');
   }
@@ -196,20 +198,42 @@ export function SourcesManager({
                 />
 
                 {editId === source.id ? (
-                  <div className="flex items-center gap-2 flex-1">
-                    <input
-                      value={editName}
-                      onChange={e => setEditName(e.target.value)}
-                      className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white flex-1"
-                    />
-                    <input
-                      value={editCat}
-                      onChange={e => setEditCat(e.target.value)}
-                      placeholder="Category"
-                      className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white w-32"
-                    />
-                    <button onClick={() => saveEdit(source.id)} className="text-xs text-indigo-400 hover:text-indigo-300">Save</button>
-                    <button onClick={() => setEditId(null)} className="text-xs text-gray-500">Cancel</button>
+                  <div className="flex-1 grid grid-cols-2 gap-2 py-1">
+                    <div className="col-span-2">
+                      <label className="text-xs text-gray-500 mb-0.5 block">Feed URL</label>
+                      <input
+                        value={editUrl}
+                        onChange={e => setEditUrl(e.target.value)}
+                        className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 mb-0.5 block">Display name</label>
+                      <input
+                        value={editName}
+                        onChange={e => setEditName(e.target.value)}
+                        className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 mb-0.5 block">Category</label>
+                      <input
+                        value={editCat}
+                        onChange={e => setEditCat(e.target.value)}
+                        placeholder="None"
+                        className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"
+                      />
+                    </div>
+                    <div className="col-span-2 flex gap-2 pt-1">
+                      <button
+                        onClick={() => saveEdit(source.id)}
+                        disabled={!editUrl.trim()}
+                        className="text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white px-3 py-1 rounded transition-colors"
+                      >
+                        Save
+                      </button>
+                      <button onClick={() => setEditId(null)} className="text-xs text-gray-500 hover:text-gray-300">Cancel</button>
+                    </div>
                   </div>
                 ) : (
                   <>

@@ -39,7 +39,7 @@ export default function App() {
 
   const {
     sources, addSource, importSources, updateSource, deleteSource,
-    renameCategory, mergeCategories, setSourceError, setSourceFetched,
+    renameCategory, mergeCategories, setSourceError, setSourceFetched, reorderSourceInCategory,
   } = useSources();
 
   const {
@@ -155,6 +155,8 @@ export default function App() {
         }}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(c => !c)}
+        sourceSort={settings.sourceSort}
+        categoryOrder={settings.categoryOrder}
       />
 
       <main className="flex-1 overflow-y-auto">
@@ -169,6 +171,9 @@ export default function App() {
             onMergeCategories={mergeCategories}
             onFetchSingle={fetchSingle}
             onDeleteArticlesBySource={deleteBySourceId}
+            sourceSort={settings.sourceSort}
+            categoryOrder={settings.categoryOrder}
+            onReorderSource={reorderSourceInCategory}
           />
         ) : (
           <div className="max-w-3xl mx-auto px-4 py-6">

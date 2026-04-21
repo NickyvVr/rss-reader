@@ -8,6 +8,8 @@ const DEFAULTS = {
   settings: {
     corsProxy: 'rss2json',
     defaultView: 'unread',
+    sourceSort: 'alpha',
+    categoryOrder: [],
   },
 };
 

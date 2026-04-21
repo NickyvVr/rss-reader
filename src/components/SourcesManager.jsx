@@ -3,15 +3,32 @@ import { AddSourceForm } from './AddSourceForm';
 import { toast } from './Toast';
 import { formatDistanceToNow } from '../utils/dateHelper';
 
+function sortedSourcesForCat(sources, cat, sourceSort) {
+  const list = sources.filter(s => (s.category || '') === cat);
+  if (sourceSort === 'alpha') return [...list].sort((a, b) => a.title.localeCompare(b.title));
+  return list;
+}
+
+function sortedCats(sources, sourceSort, categoryOrder) {
+  const all = [...new Set(sources.map(s => s.category || ''))];
+  if (sourceSort === 'alpha') return all.sort((a, b) => a.localeCompare(b));
+  return [
+    ...categoryOrder.filter(c => all.includes(c)),
+    ...all.filter(c => !categoryOrder.includes(c)).sort((a, b) => a.localeCompare(b)),
+  ];
+}
+
 export function SourcesManager({
   sources, articles, onAddSource, onUpdateSource, onDeleteSource,
   onRenameCategory, onMergeCategories, onFetchSingle, onDeleteArticlesBySource,
+  sourceSort = 'alpha', categoryOrder = [], onReorderSource,
 }) {
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   const [keepArticles, setKeepArticles] = useState(false);
   const [editName, setEditName] = useState('');
+  const [editUrl, setEditUrl] = useState('');
   const [editCat, setEditCat] = useState('');
   const [renameCat, setRenameCat] = useState(null);
   const [renameTo, setRenameTo] = useState('');
@@ -38,26 +55,27 @@ export function SourcesManager({
     articleCounts[a.sourceId] = (articleCounts[a.sourceId] || 0) + 1;
   }
 
-  const filtered = sources.filter(s =>
-    !search || s.title.toLowerCase().includes(search.toLowerCase()) ||
-    s.xmlUrl.toLowerCase().includes(search.toLowerCase())
-  );
+  const orderedCats = sortedCats(sources, sourceSort, categoryOrder);
 
+  // Build grouped using sorted order, filtered by search
   const grouped = {};
-  for (const s of filtered) {
-    const cat = s.category || '';
-    if (!grouped[cat]) grouped[cat] = [];
-    grouped[cat].push(s);
+  for (const cat of orderedCats) {
+    const list = sortedSourcesForCat(sources, cat, sourceSort).filter(s =>
+      !search || s.title.toLowerCase().includes(search.toLowerCase()) ||
+      s.xmlUrl.toLowerCase().includes(search.toLowerCase())
+    );
+    if (list.length > 0) grouped[cat] = list;
   }
 
   function startEdit(source) {
     setEditId(source.id);
     setEditName(source.title);
+    setEditUrl(source.xmlUrl);
     setEditCat(source.category || '');
   }
 
   function saveEdit(id) {
-    onUpdateSource(id, { title: editName, category: editCat });
+    onUpdateSource(id, { title: editName, xmlUrl: editUrl.trim(), category: editCat });
     setEditId(null);
     toast('Source updated');
   }
@@ -180,20 +198,42 @@ export function SourcesManager({
                 />
 
                 {editId === source.id ? (
-                  <div className="flex items-center gap-2 flex-1">
-                    <input
-                      value={editName}
-                      onChange={e => setEditName(e.target.value)}
-                      className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white flex-1"
-                    />
-                    <input
-                      value={editCat}
-                      onChange={e => setEditCat(e.target.value)}
-                      placeholder="Category"
-                      className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white w-32"
-                    />
-                    <button onClick={() => saveEdit(source.id)} className="text-xs text-indigo-400 hover:text-indigo-300">Save</button>
-                    <button onClick={() => setEditId(null)} className="text-xs text-gray-500">Cancel</button>
+                  <div className="flex-1 grid grid-cols-2 gap-2 py-1">
+                    <div className="col-span-2">
+                      <label className="text-xs text-gray-500 mb-0.5 block">Feed URL</label>
+                      <input
+                        value={editUrl}
+                        onChange={e => setEditUrl(e.target.value)}
+                        className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 mb-0.5 block">Display name</label>
+                      <input
+                        value={editName}
+                        onChange={e => setEditName(e.target.value)}
+                        className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 mb-0.5 block">Category</label>
+                      <input
+                        value={editCat}
+                        onChange={e => setEditCat(e.target.value)}
+                        placeholder="None"
+                        className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"
+                      />
+                    </div>
+                    <div className="col-span-2 flex gap-2 pt-1">
+                      <button
+                        onClick={() => saveEdit(source.id)}
+                        disabled={!editUrl.trim()}
+                        className="text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white px-3 py-1 rounded transition-colors"
+                      >
+                        Save
+                      </button>
+                      <button onClick={() => setEditId(null)} className="text-xs text-gray-500 hover:text-gray-300">Cancel</button>
+                    </div>
                   </div>
                 ) : (
                   <>
@@ -226,6 +266,30 @@ export function SourcesManager({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
                     </button>
+
+                    {/* Up/down reorder (custom sort only) */}
+                    {sourceSort === 'custom' && (
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          onClick={() => onReorderSource(source.id, 'up')}
+                          className="text-gray-600 hover:text-gray-300 transition-colors leading-none"
+                          title="Move up"
+                        >
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => onReorderSource(source.id, 'down')}
+                          className="text-gray-600 hover:text-gray-300 transition-colors leading-none"
+                          title="Move down"
+                        >
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
 
                     {/* Active toggle */}
                     <button

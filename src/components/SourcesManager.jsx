@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { AddSourceForm } from './AddSourceForm';
 import { toast } from './Toast';
 import { formatDistanceToNow } from '../utils/dateHelper';
@@ -17,6 +17,15 @@ export function SourcesManager({
   const [renameTo, setRenameTo] = useState('');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(new Set());
+  const [refreshingId, setRefreshingId] = useState(null);
+
+  const handleRefresh = useCallback(async (source) => {
+    setRefreshingId(source.id);
+    const result = await onFetchSingle(source);
+    setRefreshingId(null);
+    if (result.error) toast(`Error: ${result.error}`, 'error');
+    else toast(`Refreshed "${source.title}"`);
+  }, [onFetchSingle]);
 
   const categories = [...new Set(sources.map(s => s.category).filter(Boolean))];
 
@@ -205,6 +214,18 @@ export function SourcesManager({
                     {source.lastError && (
                       <span className="text-xs text-red-400 shrink-0" title={source.lastError}>Error</span>
                     )}
+
+                    {/* Refresh */}
+                    <button
+                      onClick={() => handleRefresh(source)}
+                      disabled={refreshingId === source.id}
+                      className="text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-40"
+                      title="Refresh this feed"
+                    >
+                      <svg className={`w-4 h-4 ${refreshingId === source.id ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    </button>
 
                     {/* Active toggle */}
                     <button

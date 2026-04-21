@@ -74,6 +74,7 @@ export function ArticleCard({ article, source, onMarkRead }) {
         href={article.url}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={() => { if (!article.isRead) onMarkRead(article.id, true); }}
         className="block mt-2 text-base font-semibold text-gray-100 hover:text-indigo-300 transition-colors leading-snug"
       >
         {article.title}

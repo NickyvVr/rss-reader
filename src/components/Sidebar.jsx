@@ -66,7 +66,7 @@ export function Sidebar({ sources, articles, currentView, onViewChange, collapse
   }
 
   return (
-    <div className="w-60 border-r border-gray-800 flex flex-col shrink-0 h-screen sticky top-0 overflow-y-auto">
+    <div className="w-60 border-r border-gray-800 flex flex-col shrink-0 h-screen sticky top-0 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-4 border-b border-gray-800">
         <span className="font-bold text-white text-sm tracking-wide">FeedlyReader</span>
         <button
@@ -80,7 +80,7 @@ export function Sidebar({ sources, articles, currentView, onViewChange, collapse
         </button>
       </div>
 
-      <nav className="flex-1 p-2 space-y-0.5">
+      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
         {navItem('unread', 'All Unread', unreadAll)}
         {navItem('all', 'All Articles', 0)}
 

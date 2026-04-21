@@ -95,20 +95,17 @@ export function useSources() {
     });
   }, []);
 
-  const reorderSourceInCategory = useCallback((id, direction) => {
+  // Move `fromId` to just before `targetId` within the same category
+  const moveSourceBefore = useCallback((fromId, targetId) => {
+    if (fromId === targetId) return;
     const existing = getSources();
-    const source = existing.find(s => s.id === id);
-    if (!source) return;
-    const peers = existing.filter(s => s.category === source.category);
-    const peerIdx = peers.findIndex(s => s.id === id);
-    const swapPeerIdx = direction === 'up' ? peerIdx - 1 : peerIdx + 1;
-    if (swapPeerIdx < 0 || swapPeerIdx >= peers.length) return;
-    const swapId = peers[swapPeerIdx].id;
-    const updated = [...existing];
-    const i = updated.findIndex(s => s.id === id);
-    const j = updated.findIndex(s => s.id === swapId);
-    [updated[i], updated[j]] = [updated[j], updated[i]];
-    persist(updated);
+    const from = existing.find(s => s.id === fromId);
+    const target = existing.find(s => s.id === targetId);
+    if (!from || !target || from.category !== target.category) return;
+    const without = existing.filter(s => s.id !== fromId);
+    const insertIdx = without.findIndex(s => s.id === targetId);
+    without.splice(insertIdx, 0, from);
+    persist(without);
   }, [persist]);
 
   const setSourceFetched = useCallback((id) => {
@@ -129,6 +126,6 @@ export function useSources() {
     mergeCategories,
     setSourceError,
     setSourceFetched,
-    reorderSourceInCategory,
+    moveSourceBefore,
   };
 }

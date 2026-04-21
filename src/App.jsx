@@ -39,7 +39,7 @@ export default function App() {
   const justReadIds = useRef(new Set());
 
   const {
-    sources, addSource, importSources, importSourcesFromSync, updateSource, deleteSource,
+    sources, addSource, importSources, syncSources, updateSource, deleteSource,
     renameCategory, mergeCategories, setSourceError, setSourceFetched, moveSourceBefore,
   } = useSources();
 
@@ -88,12 +88,13 @@ export default function App() {
     saveSettings(newSettings);
   }, []);
 
-  const handleMergeSources = useCallback((remoteSources) => {
-    const added = importSourcesFromSync(remoteSources);
-    if (added > 0) {
+  const handleSyncSources = useCallback((remoteSources, remoteDeletedIds) => {
+    const { removedIds, addedCount } = syncSources(remoteSources, remoteDeletedIds);
+    removedIds.forEach(id => deleteBySourceId(id));
+    if (addedCount > 0) {
       setTimeout(() => fetchAll(sources.filter(s => s.active)), 500);
     }
-  }, [importSourcesFromSync, sources, fetchAll]);
+  }, [syncSources, deleteBySourceId, sources, fetchAll]);
 
   const handleMergeReadIds = useCallback((remoteReadIds) => {
     markAllRead(remoteReadIds);
@@ -108,7 +109,7 @@ export default function App() {
     sources,
     articles,
     settings,
-    onMergeSources: handleMergeSources,
+    onSyncSources: handleSyncSources,
     onMergeReadIds: handleMergeReadIds,
     onMergeSettings: handleMergeSettings,
     onSaveSettings: handleSaveSettings,

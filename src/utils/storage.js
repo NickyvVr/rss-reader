@@ -10,6 +10,9 @@ const DEFAULTS = {
     defaultView: 'unread',
     sourceSort: 'alpha',
     categoryOrder: [],
+    syncPat: '',
+    syncGistId: '',
+    lastSyncedAt: null,
   },
 };
 

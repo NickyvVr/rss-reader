@@ -108,6 +108,18 @@ export function useSources() {
     persist(without);
   }, [persist]);
 
+  // Like importSources but preserves remote IDs so article hash IDs stay consistent across devices
+  const importSourcesFromSync = useCallback(remoteSources => {
+    const existing = getSources();
+    const existingUrls = new Set(existing.map(s => s.xmlUrl));
+    const toAdd = remoteSources
+      .filter(rs => !existingUrls.has(rs.xmlUrl))
+      .map(rs => ({ ...rs, lastError: null, lastFetchedAt: null }));
+    if (toAdd.length === 0) return 0;
+    persist([...existing, ...toAdd]);
+    return toAdd.length;
+  }, [persist]);
+
   const setSourceFetched = useCallback((id) => {
     setSources(prev => {
       const updated = prev.map(s => s.id === id ? { ...s, lastError: null, lastFetchedAt: new Date().toISOString() } : s);
@@ -120,6 +132,7 @@ export function useSources() {
     sources,
     addSource,
     importSources,
+    importSourcesFromSync,
     updateSource,
     deleteSource,
     renameCategory,

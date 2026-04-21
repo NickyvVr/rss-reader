@@ -8,6 +8,7 @@ import { ToastContainer, useToast } from './components/Toast';
 import { useSources } from './hooks/useSources';
 import { useArticles } from './hooks/useArticles';
 import { useFeed } from './hooks/useFeed';
+import { useSync } from './hooks/useSync';
 import { getSettings, saveSettings } from './utils/storage';
 import { formatDistanceToNow } from './utils/dateHelper';
 
@@ -38,7 +39,7 @@ export default function App() {
   const justReadIds = useRef(new Set());
 
   const {
-    sources, addSource, importSources, updateSource, deleteSource,
+    sources, addSource, importSources, importSourcesFromSync, updateSource, deleteSource,
     renameCategory, mergeCategories, setSourceError, setSourceFetched, moveSourceBefore,
   } = useSources();
 
@@ -86,6 +87,48 @@ export default function App() {
     setSettings(newSettings);
     saveSettings(newSettings);
   }, []);
+
+  const handleMergeSources = useCallback((remoteSources) => {
+    const added = importSourcesFromSync(remoteSources);
+    if (added > 0) {
+      setTimeout(() => fetchAll(sources.filter(s => s.active)), 500);
+    }
+  }, [importSourcesFromSync, sources, fetchAll]);
+
+  const handleMergeReadIds = useCallback((remoteReadIds) => {
+    markAllRead(remoteReadIds);
+  }, [markAllRead]);
+
+  const handleMergeSettings = useCallback((mergedSettings) => {
+    setSettings(mergedSettings);
+    saveSettings(mergedSettings);
+  }, []);
+
+  const { syncStatus, syncError, lastSyncedAt, isSyncing, triggerSync, syncNow, connectPat } = useSync({
+    sources,
+    articles,
+    settings,
+    onMergeSources: handleMergeSources,
+    onMergeReadIds: handleMergeReadIds,
+    onMergeSettings: handleMergeSettings,
+    onSaveSettings: handleSaveSettings,
+  });
+
+  // Trigger debounced push when sources or read-state change (skip first render)
+  const hasMounted = useRef(false);
+  const readFingerprint = useMemo(
+    () => articles.filter(a => a.isRead).length,
+    [articles]
+  );
+  useEffect(() => {
+    if (!hasMounted.current) return;
+    triggerSync();
+  }, [sources]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!hasMounted.current) return;
+    triggerSync();
+  }, [readFingerprint]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { hasMounted.current = true; }, []);
 
   const filteredArticles = useMemo(() => {
     let base = [...articles];
@@ -336,6 +379,12 @@ export default function App() {
           onClearArticles={clearAll}
           sources={sources}
           onClose={() => setShowSettings(false)}
+          syncStatus={syncStatus}
+          syncError={syncError}
+          lastSyncedAt={lastSyncedAt}
+          isSyncing={isSyncing}
+          onSyncNow={syncNow}
+          onConnectPat={connectPat}
         />
       )}
 

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { exportAsOPML } from '../utils/opmlExporter';
 import { toast } from './Toast';
+import { useState } from 'react';
 
 export function SettingsModal({ settings, onSave, onClearArticles, sources, onClose }) {
   const [form, setForm] = useState({ ...settings });
@@ -26,10 +27,34 @@ export function SettingsModal({ settings, onSave, onClearArticles, sources, onCl
     toast('OPML export downloaded');
   }
 
+  // Merged category list: stored order first, then any new ones alphabetically
+  const allCategories = useMemo(
+    () => [...new Set(sources.map(s => s.category).filter(Boolean))],
+    [sources]
+  );
+  const effectiveCatOrder = useMemo(() => {
+    const stored = form.categoryOrder || [];
+    return [
+      ...stored.filter(c => allCategories.includes(c)),
+      ...allCategories.filter(c => !stored.includes(c)).sort((a, b) => a.localeCompare(b)),
+    ];
+  }, [form.categoryOrder, allCategories]);
+
+  function moveCategory(cat, direction) {
+    const list = [...effectiveCatOrder];
+    const idx = list.indexOf(cat);
+    const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= list.length) return;
+    [list[idx], list[newIdx]] = [list[newIdx], list[idx]];
+    set('categoryOrder', list);
+  }
+
+  const arrowBtn = 'p-0.5 text-gray-500 hover:text-gray-200 transition-colors disabled:opacity-20';
+
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-lg shadow-2xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
+      <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700 shrink-0">
           <h2 className="text-lg font-semibold text-white">Settings</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -38,7 +63,7 @@ export function SettingsModal({ settings, onSave, onClearArticles, sources, onCl
           </button>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 overflow-y-auto">
           {/* CORS Proxy */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">CORS Proxy</label>
@@ -78,6 +103,76 @@ export function SettingsModal({ settings, onSave, onClearArticles, sources, onCl
             </select>
           </div>
 
+          {/* Sort order */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Feed &amp; Category Order</label>
+            <div className="flex rounded-lg overflow-hidden border border-gray-700 w-fit mb-4">
+              {[
+                { value: 'alpha', label: 'Alphabetical' },
+                { value: 'custom', label: 'Custom' },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => set('sourceSort', opt.value)}
+                  className={`px-4 py-1.5 text-sm font-medium transition-colors
+                    ${form.sourceSort === opt.value
+                      ? 'bg-indigo-600 text-white'
+                      : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {form.sourceSort === 'custom' && allCategories.length > 0 && (
+              <div>
+                <p className="text-xs text-gray-500 mb-2">
+                  Drag categories into the order you want. Source order within each category is set in Manage Sources.
+                </p>
+                <div className="border border-gray-700 rounded-lg overflow-hidden">
+                  {effectiveCatOrder.map((cat, idx) => (
+                    <div
+                      key={cat}
+                      className={`flex items-center gap-3 px-3 py-2 text-sm text-gray-200
+                        ${idx < effectiveCatOrder.length - 1 ? 'border-b border-gray-800' : ''}`}
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          onClick={() => moveCategory(cat, 'up')}
+                          disabled={idx === 0}
+                          className={arrowBtn}
+                          title="Move up"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => moveCategory(cat, 'down')}
+                          disabled={idx === effectiveCatOrder.length - 1}
+                          className={arrowBtn}
+                          title="Move down"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                      </div>
+                      <span className="truncate">{cat}</span>
+                      <span className="ml-auto text-xs text-gray-600">
+                        {sources.filter(s => s.category === cat).length} feeds
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {form.sourceSort === 'custom' && allCategories.length === 0 && (
+              <p className="text-xs text-gray-500">No categories yet — add feeds with categories first.</p>
+            )}
+          </div>
+
           {/* Data management */}
           <div className="pt-4 border-t border-gray-700 space-y-3">
             <p className="text-sm font-medium text-gray-300">Data</p>
@@ -98,7 +193,7 @@ export function SettingsModal({ settings, onSave, onClearArticles, sources, onCl
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-700 flex justify-end gap-3">
+        <div className="px-6 py-4 border-t border-gray-700 flex justify-end gap-3 shrink-0">
           <button
             onClick={onClose}
             className="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"

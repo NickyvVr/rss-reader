@@ -3,9 +3,25 @@ import { AddSourceForm } from './AddSourceForm';
 import { toast } from './Toast';
 import { formatDistanceToNow } from '../utils/dateHelper';
 
+function sortedSourcesForCat(sources, cat, sourceSort) {
+  const list = sources.filter(s => (s.category || '') === cat);
+  if (sourceSort === 'alpha') return [...list].sort((a, b) => a.title.localeCompare(b.title));
+  return list;
+}
+
+function sortedCats(sources, sourceSort, categoryOrder) {
+  const all = [...new Set(sources.map(s => s.category || ''))];
+  if (sourceSort === 'alpha') return all.sort((a, b) => a.localeCompare(b));
+  return [
+    ...categoryOrder.filter(c => all.includes(c)),
+    ...all.filter(c => !categoryOrder.includes(c)).sort((a, b) => a.localeCompare(b)),
+  ];
+}
+
 export function SourcesManager({
   sources, articles, onAddSource, onUpdateSource, onDeleteSource,
   onRenameCategory, onMergeCategories, onFetchSingle, onDeleteArticlesBySource,
+  sourceSort = 'alpha', categoryOrder = [], onReorderSource,
 }) {
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -38,16 +54,16 @@ export function SourcesManager({
     articleCounts[a.sourceId] = (articleCounts[a.sourceId] || 0) + 1;
   }
 
-  const filtered = sources.filter(s =>
-    !search || s.title.toLowerCase().includes(search.toLowerCase()) ||
-    s.xmlUrl.toLowerCase().includes(search.toLowerCase())
-  );
+  const orderedCats = sortedCats(sources, sourceSort, categoryOrder);
 
+  // Build grouped using sorted order, filtered by search
   const grouped = {};
-  for (const s of filtered) {
-    const cat = s.category || '';
-    if (!grouped[cat]) grouped[cat] = [];
-    grouped[cat].push(s);
+  for (const cat of orderedCats) {
+    const list = sortedSourcesForCat(sources, cat, sourceSort).filter(s =>
+      !search || s.title.toLowerCase().includes(search.toLowerCase()) ||
+      s.xmlUrl.toLowerCase().includes(search.toLowerCase())
+    );
+    if (list.length > 0) grouped[cat] = list;
   }
 
   function startEdit(source) {
@@ -226,6 +242,30 @@ export function SourcesManager({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
                     </button>
+
+                    {/* Up/down reorder (custom sort only) */}
+                    {sourceSort === 'custom' && (
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          onClick={() => onReorderSource(source.id, 'up')}
+                          className="text-gray-600 hover:text-gray-300 transition-colors leading-none"
+                          title="Move up"
+                        >
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => onReorderSource(source.id, 'down')}
+                          className="text-gray-600 hover:text-gray-300 transition-colors leading-none"
+                          title="Move down"
+                        >
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
 
                     {/* Active toggle */}
                     <button

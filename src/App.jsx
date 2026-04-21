@@ -54,7 +54,9 @@ export default function App() {
     onSourceFetched: setSourceFetched,
   });
 
-  const isFirstRun = sources.length === 0;
+  const isSyncConfigured = !!(settings.syncPat && settings.syncGistId);
+  // Don't treat empty sources as "first run" if sync is configured — let the pull populate them
+  const isFirstRun = sources.length === 0 && !isSyncConfigured;
 
   useEffect(() => {
     if (isFirstRun) setShowImporter(true);
@@ -105,7 +107,7 @@ export default function App() {
     saveSettings(mergedSettings);
   }, []);
 
-  const { syncStatus, syncError, lastSyncedAt, isSyncing, triggerSync, syncNow, connectPat } = useSync({
+  const { syncStatus, syncError, lastSyncedAt, isSyncing, triggerSync, pullNow, syncNow, connectPat } = useSync({
     sources,
     articles,
     settings,
@@ -130,6 +132,15 @@ export default function App() {
     triggerSync();
   }, [readFingerprint]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { hasMounted.current = true; }, []);
+
+  // Pull on visibility change — when user switches back to the tab/app on phone
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.visibilityState === 'visible') pullNow();
+    }
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [pullNow]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredArticles = useMemo(() => {
     let base = [...articles];
@@ -307,19 +318,31 @@ export default function App() {
               })()}
             </div>
 
-            {/* OPML import prompt */}
+            {/* Empty state */}
             {sources.length === 0 && (
-              <div className="text-center py-20">
-                <p className="text-4xl mb-4">📡</p>
-                <p className="text-gray-300 font-semibold text-lg mb-2">No feeds yet</p>
-                <p className="text-gray-500 text-sm mb-6">Import an OPML file to get started, or add feeds manually.</p>
-                <button
-                  onClick={() => setShowImporter(true)}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-5 py-2.5 rounded-lg transition-colors"
-                >
-                  Import OPML
-                </button>
-              </div>
+              isSyncConfigured ? (
+                <div className="text-center py-20">
+                  <p className="text-gray-500 text-sm animate-pulse">Loading feeds from sync…</p>
+                  <button
+                    onClick={syncNow}
+                    className="mt-4 text-xs text-indigo-400 hover:underline"
+                  >
+                    Sync now
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center py-20">
+                  <p className="text-4xl mb-4">📡</p>
+                  <p className="text-gray-300 font-semibold text-lg mb-2">No feeds yet</p>
+                  <p className="text-gray-500 text-sm mb-6">Import an OPML file to get started, or add feeds manually.</p>
+                  <button
+                    onClick={() => setShowImporter(true)}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-5 py-2.5 rounded-lg transition-colors"
+                  >
+                    Import OPML
+                  </button>
+                </div>
+              )
             )}
 
             {/* Article list */}

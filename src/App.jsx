@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ArticleCard } from './components/ArticleCard';
 import { SourcesManager } from './components/SourcesManager';
@@ -35,6 +35,8 @@ export default function App() {
   const [showImporter, setShowImporter] = useState(false);
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState(settings.defaultView);
+  // IDs marked read during this view session — kept visible until user navigates away
+  const justReadIds = useRef(new Set());
 
   const {
     sources, addSource, importSources, updateSource, deleteSource,
@@ -79,6 +81,17 @@ export default function App() {
     });
   }, [articles.length, settings.anthropicApiKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Clear just-read set whenever the user navigates to a different view
+  useEffect(() => {
+    justReadIds.current = new Set();
+  }, [view, viewMode]);
+
+  const handleMarkRead = useCallback((id, isRead) => {
+    markRead(id, isRead);
+    if (isRead) justReadIds.current.add(id);
+    else justReadIds.current.delete(id);
+  }, [markRead]);
+
   const handleImport = useCallback(async (rawSources) => {
     const result = importSources(rawSources);
     setTimeout(() => fetchAll(sources.filter(s => s.active)), 100);
@@ -103,7 +116,7 @@ export default function App() {
     }
 
     if (viewMode === 'unread') {
-      base = base.filter(a => !a.isRead);
+      base = base.filter(a => !a.isRead || justReadIds.current.has(a.id));
     }
 
     if (search.trim()) {
@@ -129,7 +142,9 @@ export default function App() {
   function handleMarkAllRead() {
     const unread = filteredArticles.filter(a => !a.isRead);
     if (unread.length > 10 && !window.confirm(`Mark all ${unread.length} articles as read?`)) return;
-    markAllRead(unread.map(a => a.id));
+    const ids = unread.map(a => a.id);
+    markAllRead(ids);
+    ids.forEach(id => justReadIds.current.add(id));
   }
 
   function getViewTitle() {
@@ -276,7 +291,7 @@ export default function App() {
                       key={article.id}
                       article={article}
                       source={source}
-                      onMarkRead={markRead}
+                      onMarkRead={handleMarkRead}
                       onGenerateShort={generateShort}
                       onGenerateLong={generateLong}
                       hasApiKey={!!settings.anthropicApiKey}

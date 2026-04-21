@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { AddSourceForm } from './AddSourceForm';
 import { toast } from './Toast';
 import { formatDistanceToNow } from '../utils/dateHelper';
@@ -21,7 +21,7 @@ function sortedCats(sources, sourceSort, categoryOrder) {
 export function SourcesManager({
   sources, articles, onAddSource, onUpdateSource, onDeleteSource,
   onRenameCategory, onMergeCategories, onFetchSingle, onDeleteArticlesBySource,
-  sourceSort = 'alpha', categoryOrder = [], onReorderSource,
+  sourceSort = 'alpha', categoryOrder = [], onMoveSource,
 }) {
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -43,6 +43,32 @@ export function SourcesManager({
     if (result.error) toast(`Error: ${result.error}`, 'error');
     else toast(`Refreshed "${source.title}"`);
   }, [onFetchSingle]);
+
+  // Drag-and-drop state
+  const dragId = useRef(null);
+  const [dragOverId, setDragOverId] = useState(null);
+
+  function handleDragStart(e, id) {
+    dragId.current = id;
+    e.dataTransfer.effectAllowed = 'move';
+  }
+  function handleDragOver(e, id) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (id !== dragId.current) setDragOverId(id);
+  }
+  function handleDrop(e, targetId) {
+    e.preventDefault();
+    if (dragId.current && targetId !== dragId.current) {
+      onMoveSource(dragId.current, targetId);
+    }
+    dragId.current = null;
+    setDragOverId(null);
+  }
+  function handleDragEnd() {
+    dragId.current = null;
+    setDragOverId(null);
+  }
 
   const categories = [...new Set(sources.map(s => s.category).filter(Boolean))];
 
@@ -186,9 +212,16 @@ export function SourcesManager({
             {catSources.map((source, idx) => (
               <div
                 key={source.id}
-                className={`flex items-center gap-3 px-4 py-3 text-sm
+                draggable={sourceSort === 'custom' && editId !== source.id}
+                onDragStart={e => handleDragStart(e, source.id)}
+                onDragOver={e => handleDragOver(e, source.id)}
+                onDrop={e => handleDrop(e, source.id)}
+                onDragEnd={handleDragEnd}
+                className={`flex items-center gap-3 px-4 py-3 text-sm transition-colors
                   ${idx < catSources.length - 1 ? 'border-b border-gray-800' : ''}
-                  ${source.active ? 'bg-gray-900/40' : 'bg-gray-900/20 opacity-60'}`}
+                  ${source.active ? 'bg-gray-900/40' : 'bg-gray-900/20 opacity-60'}
+                  ${dragOverId === source.id ? 'border-t-2 border-t-indigo-500' : ''}
+                  ${dragId.current === source.id ? 'opacity-40' : ''}`}
               >
                 <input
                   type="checkbox"
@@ -267,28 +300,13 @@ export function SourcesManager({
                       </svg>
                     </button>
 
-                    {/* Up/down reorder (custom sort only) */}
+                    {/* Drag handle (custom sort only) */}
                     {sourceSort === 'custom' && (
-                      <div className="flex flex-col gap-0.5">
-                        <button
-                          onClick={() => onReorderSource(source.id, 'up')}
-                          className="text-gray-600 hover:text-gray-300 transition-colors leading-none"
-                          title="Move up"
-                        >
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => onReorderSource(source.id, 'down')}
-                          className="text-gray-600 hover:text-gray-300 transition-colors leading-none"
-                          title="Move down"
-                        >
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                      </div>
+                      <svg className="w-4 h-4 text-gray-600 cursor-grab active:cursor-grabbing shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                        <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
+                        <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+                        <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+                      </svg>
                     )}
 
                     {/* Active toggle */}

@@ -39,7 +39,7 @@ export default function App() {
 
   const {
     sources, addSource, importSources, updateSource, deleteSource,
-    renameCategory, mergeCategories, setSourceError, setSourceFetched, reorderSourceInCategory,
+    renameCategory, mergeCategories, setSourceError, setSourceFetched, moveSourceBefore,
   } = useSources();
 
   const {
@@ -173,7 +173,7 @@ export default function App() {
             onDeleteArticlesBySource={deleteBySourceId}
             sourceSort={settings.sourceSort}
             categoryOrder={settings.categoryOrder}
-            onReorderSource={reorderSourceInCategory}
+            onMoveSource={moveSourceBefore}
           />
         ) : (
           <div className="max-w-3xl mx-auto px-4 py-6">

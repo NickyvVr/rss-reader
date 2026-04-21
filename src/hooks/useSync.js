@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   validatePat, findExistingSyncGist, fetchGist, createGist, updateGist, GistApiError,
 } from '../utils/gistApi';
+import { getDeletedSourceIds } from '../utils/storage';
 
 export const SYNC_STATUS = {
   IDLE: 'idle',
@@ -28,7 +29,7 @@ export function useSync({
   sources,
   articles,
   settings,
-  onMergeSources,
+  onSyncSources,
   onMergeReadIds,
   onMergeSettings,
   onSaveSettings,
@@ -43,7 +44,7 @@ export function useSync({
 
   // Keep a ref to latest values so async callbacks don't close over stale state
   const ref = useRef({});
-  ref.current = { sources, articles, settings, onMergeSources, onMergeReadIds, onMergeSettings, onSaveSettings };
+  ref.current = { sources, articles, settings, onSyncSources, onMergeReadIds, onMergeSettings, onSaveSettings };
 
   useEffect(() => {
     isMounted.current = true;
@@ -57,12 +58,20 @@ export function useSync({
     const { sources, articles, settings } = ref.current;
     const cleanSources = sources.map(({ lastError: _e, lastFetchedAt: _f, ...rest }) => rest);
     const readIds = articles.filter(a => a.isRead).map(a => a.id);
+    const deletedSourceIds = getDeletedSourceIds();
     const { syncPat: _p, syncGistId: _g, lastSyncedAt: _s, ...syncableSettings } = settings;
-    return { version: 1, syncedAt: new Date().toISOString(), sources: cleanSources, readIds, settings: syncableSettings };
+    return {
+      version: 1,
+      syncedAt: new Date().toISOString(),
+      sources: cleanSources,
+      deletedSourceIds,
+      readIds,
+      settings: syncableSettings,
+    };
   }
 
   const pullAndMerge = useCallback(async () => {
-    const { settings, sources, articles, onMergeSources, onMergeReadIds, onMergeSettings, onSaveSettings } = ref.current;
+    const { settings, articles, onSyncSources, onMergeReadIds, onMergeSettings, onSaveSettings } = ref.current;
     if (!settings.syncPat || !settings.syncGistId) return;
 
     setSyncStatus(SYNC_STATUS.PULLING);
@@ -71,12 +80,10 @@ export function useSync({
       const remote = await fetchGist(settings.syncPat, settings.syncGistId);
       if (!isMounted.current) return;
 
-      // Merge sources (additive, ID-preserving)
-      const localUrls = new Set(sources.map(s => s.xmlUrl));
-      const newSources = (remote.sources ?? []).filter(rs => !localUrls.has(rs.xmlUrl));
-      if (newSources.length > 0) onMergeSources(newSources);
+      // Full source sync: handles deletions, updates, additions, ordering
+      onSyncSources(remote.sources ?? [], remote.deletedSourceIds ?? []);
 
-      // Merge read IDs (union)
+      // Merge read IDs (union — once read, stays read everywhere)
       const localReadSet = new Set(articles.filter(a => a.isRead).map(a => a.id));
       const newReadIds = (remote.readIds ?? []).filter(id => !localReadSet.has(id));
       if (newReadIds.length > 0) onMergeReadIds(newReadIds);
@@ -146,7 +153,6 @@ export function useSync({
     await pushToGist();
   }, [pullAndMerge, pushToGist]);
 
-  // Expose validatePat + findExistingSyncGist for use in SettingsModal
   const connectPat = useCallback(async (pat) => {
     const username = await validatePat(pat);
     const existingGistId = await findExistingSyncGist(pat);

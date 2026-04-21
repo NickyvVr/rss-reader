@@ -1,6 +1,9 @@
 import { useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { getSources, saveSources } from '../utils/storage';
+import {
+  getSources, saveSources,
+  getDeletedSourceIds, addDeletedSourceId, saveDeletedSourceIds,
+} from '../utils/storage';
 
 export function useSources() {
   const [sources, setSources] = useState(() => getSources());
@@ -69,6 +72,7 @@ export function useSources() {
     const existing = getSources();
     const updated = existing.filter(s => s.id !== id);
     persist(updated);
+    addDeletedSourceId(id);
   }, [persist]);
 
   const renameCategory = useCallback((oldName, newName) => {
@@ -108,16 +112,56 @@ export function useSources() {
     persist(without);
   }, [persist]);
 
-  // Like importSources but preserves remote IDs so article hash IDs stay consistent across devices
-  const importSourcesFromSync = useCallback(remoteSources => {
+  // Full sync merge: handles deletions, updates, additions, and ordering
+  const syncSources = useCallback((remoteSources, remoteDeletedIds = []) => {
     const existing = getSources();
-    const existingUrls = new Set(existing.map(s => s.xmlUrl));
-    const toAdd = remoteSources
-      .filter(rs => !existingUrls.has(rs.xmlUrl))
-      .map(rs => ({ ...rs, lastError: null, lastFetchedAt: null }));
-    if (toAdd.length === 0) return 0;
-    persist([...existing, ...toAdd]);
-    return toAdd.length;
+    const localDeletedIds = getDeletedSourceIds();
+
+    // Merge tombstone lists
+    const allDeletedSet = new Set([...localDeletedIds, ...remoteDeletedIds]);
+    if (allDeletedSet.size > localDeletedIds.length) {
+      saveDeletedSourceIds([...allDeletedSet]);
+    }
+
+    // Find which local sources are newly tombstoned by remote
+    const removedIds = existing
+      .filter(s => allDeletedSet.has(s.id))
+      .map(s => s.id);
+
+    // Remove tombstoned sources locally
+    const surviving = existing.filter(s => !allDeletedSet.has(s.id));
+    const localByUrl = new Map(surviving.map(s => [s.xmlUrl, s]));
+
+    // Process remote sources: update metadata on existing, add new ones
+    for (const rs of remoteSources) {
+      if (allDeletedSet.has(rs.id)) continue;
+      if (localByUrl.has(rs.xmlUrl)) {
+        const local = localByUrl.get(rs.xmlUrl);
+        localByUrl.set(rs.xmlUrl, {
+          ...local,
+          title: rs.title,
+          category: rs.category,
+          htmlUrl: rs.htmlUrl,
+          active: rs.active,
+        });
+      } else {
+        // New source — preserve remote ID for article hash consistency
+        localByUrl.set(rs.xmlUrl, { ...rs, lastError: null, lastFetchedAt: null });
+      }
+    }
+
+    // Order: follow remote order first, then local-only sources at end
+    const remoteActive = remoteSources.filter(rs => !allDeletedSet.has(rs.id));
+    const remoteUrlSet = new Set(remoteActive.map(rs => rs.xmlUrl));
+    const localOnly = surviving.filter(s => !remoteUrlSet.has(s.xmlUrl));
+    const ordered = [
+      ...remoteActive.map(rs => localByUrl.get(rs.xmlUrl)).filter(Boolean),
+      ...localOnly,
+    ];
+
+    persist(ordered);
+    const addedCount = ordered.filter(s => !existing.some(e => e.xmlUrl === s.xmlUrl)).length;
+    return { removedIds, addedCount };
   }, [persist]);
 
   const setSourceFetched = useCallback((id) => {
@@ -132,7 +176,7 @@ export function useSources() {
     sources,
     addSource,
     importSources,
-    importSourcesFromSync,
+    syncSources,
     updateSource,
     deleteSource,
     renameCategory,

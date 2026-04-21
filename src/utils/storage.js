@@ -2,6 +2,7 @@ const KEYS = {
   SOURCES: 'feedlyreader_sources',
   ARTICLES: 'feedlyreader_articles',
   SETTINGS: 'feedlyreader_settings',
+  DELETED_SOURCES: 'feedlyreader_deleted_sources',
 };
 
 const DEFAULTS = {
@@ -72,4 +73,20 @@ export function saveSettings(settings) {
 
 export function clearArticles() {
   localStorage.removeItem(KEYS.ARTICLES);
+}
+
+export function getDeletedSourceIds() {
+  try { return JSON.parse(localStorage.getItem(KEYS.DELETED_SOURCES) || '[]'); }
+  catch { return []; }
+}
+
+export function addDeletedSourceId(id) {
+  const existing = getDeletedSourceIds();
+  if (!existing.includes(id)) {
+    localStorage.setItem(KEYS.DELETED_SOURCES, JSON.stringify([...existing, id]));
+  }
+}
+
+export function saveDeletedSourceIds(ids) {
+  localStorage.setItem(KEYS.DELETED_SOURCES, JSON.stringify(ids));
 }

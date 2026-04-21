@@ -1,23 +1,14 @@
 import { useState } from 'react';
 import { formatDistanceToNow } from '../utils/dateHelper';
-import { SummaryBlock } from './SummaryBlock';
 import { ShareButtons } from './ShareButtons';
 
-export function ArticleCard({ article, source, onMarkRead, onGenerateShort, onGenerateLong, hasApiKey, autoMarkReadOnExpand }) {
-  const [expanded, setExpanded] = useState(false);
+export function ArticleCard({ article, source, onMarkRead }) {
+  const [expanded, setExpanded] = useState(true);
 
   const sourceName = source?.title || 'Unknown Source';
   const faviconUrl = source?.htmlUrl
     ? `${source.htmlUrl.replace(/\/$/, '')}/favicon.ico`
     : null;
-
-  function handleExpand() {
-    const newExpanded = !expanded;
-    setExpanded(newExpanded);
-    if (newExpanded && autoMarkReadOnExpand && !article.isRead) {
-      onMarkRead(article.id, true);
-    }
-  }
 
   return (
     <article
@@ -64,7 +55,7 @@ export function ArticleCard({ article, source, onMarkRead, onGenerateShort, onGe
           </button>
 
           <button
-            onClick={handleExpand}
+            onClick={() => setExpanded(e => !e)}
             className="p-1.5 text-gray-500 hover:text-gray-300 rounded-md transition-colors"
             title={expanded ? 'Collapse' : 'Expand'}
           >
@@ -88,15 +79,7 @@ export function ArticleCard({ article, source, onMarkRead, onGenerateShort, onGe
         {article.title}
       </a>
 
-      {/* Summary */}
-      <SummaryBlock
-        article={article}
-        onGenerateShort={onGenerateShort}
-        onGenerateLong={onGenerateLong}
-        hasApiKey={hasApiKey}
-      />
-
-      {/* Expanded: snippet + share */}
+      {/* Snippet + share */}
       {expanded && (
         <div className="mt-3 pt-3 border-t border-gray-800">
           {article.contentSnippet && (

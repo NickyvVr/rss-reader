@@ -8,7 +8,6 @@ import { ToastContainer, useToast } from './components/Toast';
 import { useSources } from './hooks/useSources';
 import { useArticles } from './hooks/useArticles';
 import { useFeed } from './hooks/useFeed';
-import { useSummary } from './hooks/useSummary';
 import { getSettings, saveSettings } from './utils/storage';
 import { formatDistanceToNow } from './utils/dateHelper';
 
@@ -54,11 +53,6 @@ export default function App() {
     onSourceFetched: setSourceFetched,
   });
 
-  const { generateShort, generateLong } = useSummary({
-    apiKey: settings.anthropicApiKey,
-    onUpdateArticle: updateArticle,
-  });
-
   const isFirstRun = sources.length === 0;
 
   useEffect(() => {
@@ -70,16 +64,6 @@ export default function App() {
       fetchAll(sources);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-generate short summaries for new articles
-  useEffect(() => {
-    if (!settings.anthropicApiKey) return;
-    const pending = articles.filter(a => !a.shortSummary && a.contentSnippet);
-    if (pending.length === 0) return;
-    pending.slice(0, 5).forEach(a => {
-      generateShort(a).catch(() => {});
-    });
-  }, [articles.length, settings.anthropicApiKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Clear just-read set whenever the user navigates to a different view
   useEffect(() => {
@@ -292,10 +276,6 @@ export default function App() {
                       article={article}
                       source={source}
                       onMarkRead={handleMarkRead}
-                      onGenerateShort={generateShort}
-                      onGenerateLong={generateLong}
-                      hasApiKey={!!settings.anthropicApiKey}
-                      autoMarkReadOnExpand={settings.autoMarkReadOnExpand}
                     />
                   );
                 })}

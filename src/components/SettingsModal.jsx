@@ -15,7 +15,7 @@ function SyncStatusBadge({ syncStatus, lastSyncedAt, isSyncing }) {
 
 export function SettingsModal({
   settings, onSave, onClearArticles, sources, onClose,
-  syncStatus, syncError, lastSyncedAt, isSyncing, onSyncNow, onConnectPat,
+  syncStatus, syncError, lastSyncedAt, isSyncing, onSyncNow, onConnectPat, onResetAndPull,
 }) {
   const [form, setForm] = useState({ ...settings });
   const [patInput, setPatInput] = useState(settings.syncPat || '');
@@ -305,6 +305,18 @@ export function SettingsModal({
                     Disconnect
                   </button>
                 </div>
+                <button
+                  onClick={() => {
+                    if (window.confirm('Replace all local sources with the remote sync data?\n\nThis removes any local-only feeds. Your read history stays intact.')) {
+                      onResetAndPull();
+                    }
+                  }}
+                  disabled={isSyncing || !form.syncGistId}
+                  className="w-full text-sm px-3 py-1.5 text-gray-500 hover:text-gray-300 hover:bg-gray-800/50
+                             disabled:opacity-30 rounded-lg transition-colors text-left"
+                >
+                  Replace local sources with remote…
+                </button>
                 {syncError && (
                   <p className="text-xs text-red-400">{syncError}</p>
                 )}

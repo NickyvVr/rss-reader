@@ -9,7 +9,7 @@ import { useSources } from './hooks/useSources';
 import { useArticles } from './hooks/useArticles';
 import { useFeed } from './hooks/useFeed';
 import { useSync } from './hooks/useSync';
-import { getSettings, saveSettings } from './utils/storage';
+import { getSettings, saveSettings, saveDeletedSourceIds } from './utils/storage';
 import { formatDistanceToNow } from './utils/dateHelper';
 
 function SkeletonCard() {
@@ -30,7 +30,7 @@ export default function App() {
   const { toasts } = useToast();
   const [settings, setSettings] = useState(() => getSettings());
   const [view, setView] = useState(settings.defaultView);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth < 768);
   const [showSettings, setShowSettings] = useState(false);
   const [showImporter, setShowImporter] = useState(false);
   const [search, setSearch] = useState('');
@@ -39,7 +39,7 @@ export default function App() {
   const justReadIds = useRef(new Set());
 
   const {
-    sources, addSource, importSources, syncSources, updateSource, deleteSource,
+    sources, addSource, importSources, syncSources, clearSources, updateSource, deleteSource,
     renameCategory, mergeCategories, setSourceError, setSourceFetched, moveSourceBefore,
   } = useSources();
 
@@ -132,6 +132,12 @@ export default function App() {
     triggerSync();
   }, [readFingerprint]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { hasMounted.current = true; }, []);
+
+  const handleResetAndPull = useCallback(async () => {
+    clearSources();
+    saveDeletedSourceIds([]);
+    setTimeout(pullNow, 300);
+  }, [clearSources, pullNow]);
 
   // Pull on visibility change — when user switches back to the tab/app on phone
   useEffect(() => {
@@ -409,6 +415,7 @@ export default function App() {
           isSyncing={isSyncing}
           onSyncNow={syncNow}
           onConnectPat={connectPat}
+          onResetAndPull={handleResetAndPull}
         />
       )}
 

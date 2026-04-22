@@ -165,6 +165,7 @@ export function useSync({
     lastSyncedAt,
     isSyncing: syncStatus === SYNC_STATUS.PULLING || syncStatus === SYNC_STATUS.PUSHING,
     triggerSync,
+    pullNow: pullAndMerge,
     syncNow,
     connectPat,
   };

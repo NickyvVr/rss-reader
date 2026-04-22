@@ -164,6 +164,10 @@ export function useSources() {
     return { removedIds, addedCount };
   }, [persist]);
 
+  const clearSources = useCallback(() => {
+    persist([]);
+  }, [persist]);
+
   const setSourceFetched = useCallback((id) => {
     setSources(prev => {
       const updated = prev.map(s => s.id === id ? { ...s, lastError: null, lastFetchedAt: new Date().toISOString() } : s);
@@ -177,6 +181,7 @@ export function useSources() {
     addSource,
     importSources,
     syncSources,
+    clearSources,
     updateSource,
     deleteSource,
     renameCategory,

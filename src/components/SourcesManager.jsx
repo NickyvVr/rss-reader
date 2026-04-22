@@ -217,22 +217,30 @@ export function SourcesManager({
                 onDragOver={e => handleDragOver(e, source.id)}
                 onDrop={e => handleDrop(e, source.id)}
                 onDragEnd={handleDragEnd}
-                className={`flex items-center gap-3 px-4 py-3 text-sm transition-colors
+                className={`flex items-center gap-2 px-3 py-3 text-sm transition-colors
                   ${idx < catSources.length - 1 ? 'border-b border-gray-800' : ''}
                   ${source.active ? 'bg-gray-900/40' : 'bg-gray-900/20 opacity-60'}
                   ${dragOverId === source.id ? 'border-t-2 border-t-indigo-500' : ''}
                   ${dragId.current === source.id ? 'opacity-40' : ''}`}
               >
+                {sourceSort === 'custom' && editId !== source.id && (
+                  <svg className="w-4 h-4 text-gray-600 cursor-grab active:cursor-grabbing shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
+                    <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+                    <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+                  </svg>
+                )}
+
                 <input
                   type="checkbox"
                   checked={selected.has(source.id)}
                   onChange={() => toggleSelect(source.id)}
-                  className="rounded text-indigo-600"
+                  className="rounded text-indigo-600 shrink-0"
                 />
 
                 {editId === source.id ? (
-                  <div className="flex-1 grid grid-cols-2 gap-2 py-1">
-                    <div className="col-span-2">
+                  <div className="flex-1 space-y-2 py-1">
+                    <div>
                       <label className="text-xs text-gray-500 mb-0.5 block">Feed URL</label>
                       <input
                         value={editUrl}
@@ -240,24 +248,26 @@ export function SourcesManager({
                         className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white font-mono"
                       />
                     </div>
-                    <div>
-                      <label className="text-xs text-gray-500 mb-0.5 block">Display name</label>
-                      <input
-                        value={editName}
-                        onChange={e => setEditName(e.target.value)}
-                        className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"
-                      />
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-gray-500 mb-0.5 block">Display name</label>
+                        <input
+                          value={editName}
+                          onChange={e => setEditName(e.target.value)}
+                          className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-0.5 block">Category</label>
+                        <input
+                          value={editCat}
+                          onChange={e => setEditCat(e.target.value)}
+                          placeholder="None"
+                          className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-xs text-gray-500 mb-0.5 block">Category</label>
-                      <input
-                        value={editCat}
-                        onChange={e => setEditCat(e.target.value)}
-                        placeholder="None"
-                        className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"
-                      />
-                    </div>
-                    <div className="col-span-2 flex gap-2 pt-1">
+                    <div className="flex gap-2 pt-1">
                       <button
                         onClick={() => saveEdit(source.id)}
                         disabled={!editUrl.trim()}
@@ -270,66 +280,58 @@ export function SourcesManager({
                   </div>
                 ) : (
                   <>
+                    {/* Title + URL + meta — grows to fill available space */}
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-gray-200 truncate">{source.title}</div>
                       <div className="text-xs text-gray-500 truncate">{source.xmlUrl}</div>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        {unreadCounts[source.id] > 0 && (
+                          <span className="text-xs text-indigo-400">{unreadCounts[source.id]} unread</span>
+                        )}
+                        {source.lastError && (
+                          <span className="text-xs text-red-400" title={source.lastError}>Error</span>
+                        )}
+                        {source.lastFetchedAt && !source.lastError && (
+                          <span className="text-xs text-gray-600 hidden sm:inline">{formatDistanceToNow(source.lastFetchedAt)}</span>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="shrink-0 text-xs text-gray-500 text-right">
-                      <div>{unreadCounts[source.id] ? <span className="text-indigo-400">{unreadCounts[source.id]} unread</span> : null}</div>
-                      <div>{articleCounts[source.id] || 0} total</div>
+                    {/* Compact action strip */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => handleRefresh(source)}
+                        disabled={refreshingId === source.id}
+                        className="p-1.5 text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-40"
+                        title="Refresh"
+                      >
+                        <svg className={`w-4 h-4 ${refreshingId === source.id ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                      </button>
+
+                      <button
+                        onClick={() => onUpdateSource(source.id, { active: !source.active })}
+                        className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors
+                          ${source.active ? 'bg-indigo-600' : 'bg-gray-700'}`}
+                        title={source.active ? 'Disable' : 'Enable'}
+                      >
+                        <span className={`inline-block h-4 w-4 mt-0.5 rounded-full bg-white shadow transform transition-transform
+                          ${source.active ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                      </button>
+
+                      <button onClick={() => startEdit(source)} className="p-1.5 text-gray-500 hover:text-gray-300 transition-colors" title="Edit">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+
+                      <button onClick={() => setDeleteId(source.id)} className="p-1.5 text-gray-500 hover:text-red-400 transition-colors" title="Delete">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
                     </div>
-
-                    {source.lastFetchedAt && (
-                      <div className="shrink-0 text-xs text-gray-600">{formatDistanceToNow(source.lastFetchedAt)}</div>
-                    )}
-
-                    {source.lastError && (
-                      <span className="text-xs text-red-400 shrink-0" title={source.lastError}>Error</span>
-                    )}
-
-                    {/* Refresh */}
-                    <button
-                      onClick={() => handleRefresh(source)}
-                      disabled={refreshingId === source.id}
-                      className="text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-40"
-                      title="Refresh this feed"
-                    >
-                      <svg className={`w-4 h-4 ${refreshingId === source.id ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                    </button>
-
-                    {/* Drag handle (custom sort only) */}
-                    {sourceSort === 'custom' && (
-                      <svg className="w-4 h-4 text-gray-600 cursor-grab active:cursor-grabbing shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                        <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
-                        <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
-                        <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
-                      </svg>
-                    )}
-
-                    {/* Active toggle */}
-                    <button
-                      onClick={() => onUpdateSource(source.id, { active: !source.active })}
-                      className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors
-                        ${source.active ? 'bg-indigo-600' : 'bg-gray-700'}`}
-                    >
-                      <span className={`inline-block h-4 w-4 mt-0.5 rounded-full bg-white shadow transform transition-transform
-                        ${source.active ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                    </button>
-
-                    <button onClick={() => startEdit(source)} className="text-gray-500 hover:text-gray-300 transition-colors">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
-
-                    <button onClick={() => setDeleteId(source.id)} className="text-gray-500 hover:text-red-400 transition-colors">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
                   </>
                 )}
               </div>

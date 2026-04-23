@@ -282,12 +282,18 @@ export function SettingsModal({
               </>
             ) : (
               <>
-                <p className="text-xs text-gray-500">
-                  {form.syncGistId
-                    ? <>Gist: <code className="text-xs bg-gray-800 px-1 rounded">{form.syncGistId.slice(0, 10)}…</code></>
-                    : 'First sync will create the gist.'
-                  }
-                </p>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Gist ID</label>
+                  <input
+                    type="text"
+                    value={form.syncGistId || ''}
+                    onChange={e => set('syncGistId', e.target.value.trim())}
+                    placeholder="Paste an existing Gist ID, or leave blank to create new"
+                    autoComplete="off"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white
+                               placeholder-gray-500 focus:outline-none focus:border-indigo-500 font-mono"
+                  />
+                </div>
                 <div className="flex gap-2">
                   <button
                     onClick={onSyncNow}

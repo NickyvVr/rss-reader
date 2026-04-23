@@ -59,10 +59,6 @@ export default function App() {
   const isFirstRun = sources.length === 0 && !isSyncConfigured;
 
   useEffect(() => {
-    if (isFirstRun) setShowImporter(true);
-  }, [isFirstRun]);
-
-  useEffect(() => {
     if (sources.length > 0) {
       fetchAll(sources);
     }

@@ -30,7 +30,7 @@ export function useSync({
   articles,
   settings,
   onSyncSources,
-  onMergeReadIds,
+  onMergeReadUrls,
   onMergeSettings,
   onSaveSettings,
 }) {
@@ -44,7 +44,7 @@ export function useSync({
 
   // Keep a ref to latest values so async callbacks don't close over stale state
   const ref = useRef({});
-  ref.current = { sources, articles, settings, onSyncSources, onMergeReadIds, onMergeSettings, onSaveSettings };
+  ref.current = { sources, articles, settings, onSyncSources, onMergeReadUrls, onMergeSettings, onSaveSettings };
 
   useEffect(() => {
     isMounted.current = true;
@@ -57,7 +57,7 @@ export function useSync({
   function buildPayload() {
     const { sources, articles, settings } = ref.current;
     const cleanSources = sources.map(({ lastError: _e, lastFetchedAt: _f, ...rest }) => rest);
-    const readIds = articles.filter(a => a.isRead).map(a => a.id);
+    const readUrls = articles.filter(a => a.isRead).map(a => a.url);
     const deletedSourceIds = getDeletedSourceIds();
     const { syncPat: _p, syncGistId: _g, lastSyncedAt: _s, ...syncableSettings } = settings;
     return {
@@ -65,13 +65,13 @@ export function useSync({
       syncedAt: new Date().toISOString(),
       sources: cleanSources,
       deletedSourceIds,
-      readIds,
+      readUrls,
       settings: syncableSettings,
     };
   }
 
   const pullAndMerge = useCallback(async () => {
-    const { settings, articles, onSyncSources, onMergeReadIds, onMergeSettings, onSaveSettings } = ref.current;
+    const { settings, articles, onSyncSources, onMergeReadUrls, onMergeSettings, onSaveSettings } = ref.current;
     if (!settings.syncPat || !settings.syncGistId) return;
 
     setSyncStatus(SYNC_STATUS.PULLING);
@@ -80,13 +80,15 @@ export function useSync({
       const remote = await fetchGist(settings.syncPat, settings.syncGistId);
       if (!isMounted.current) return;
 
-      // Full source sync: handles deletions, updates, additions, ordering
-      onSyncSources(remote.sources ?? [], remote.deletedSourceIds ?? []);
+      // Full source sync: pass lastSyncedAt so pre-sync local-only sources can be pruned
+      onSyncSources(remote.sources ?? [], remote.deletedSourceIds ?? [], settings.lastSyncedAt ?? null);
 
-      // Merge read IDs (union — once read, stays read everywhere)
-      const localReadSet = new Set(articles.filter(a => a.isRead).map(a => a.id));
-      const newReadIds = (remote.readIds ?? []).filter(id => !localReadSet.has(id));
-      if (newReadIds.length > 0) onMergeReadIds(newReadIds);
+      // Merge read URLs (union — once read, stays read everywhere). Fall back to readIds for
+      // payloads written before this change (backward compat).
+      const localReadUrls = new Set(articles.filter(a => a.isRead).map(a => a.url));
+      const remoteReadUrls = remote.readUrls ?? [];
+      const newReadUrls = remoteReadUrls.filter(u => u && !localReadUrls.has(u));
+      if (newReadUrls.length > 0) onMergeReadUrls(newReadUrls);
 
       // Merge settings (last-write-wins by syncedAt)
       const { lastSyncedAt: prevSync } = settings;

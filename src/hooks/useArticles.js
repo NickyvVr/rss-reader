@@ -79,6 +79,18 @@ export function useArticles() {
     });
   }, []);
 
+  const markReadByUrls = useCallback(urls => {
+    setArticles(prev => {
+      const urlSet = new Set(urls);
+      const now = new Date().toISOString();
+      const updated = prev.map(a =>
+        urlSet.has(a.url) ? { ...a, isRead: true, readAt: now } : a
+      );
+      saveArticles(updated);
+      return updated;
+    });
+  }, []);
+
   const updateArticle = useCallback((id, changes) => {
     setArticles(prev => {
       const updated = prev.map(a => a.id === id ? { ...a, ...changes } : a);
@@ -105,6 +117,7 @@ export function useArticles() {
     mergeArticles,
     markRead,
     markAllRead,
+    markReadByUrls,
     updateArticle,
     deleteBySourceId,
     clearAll,

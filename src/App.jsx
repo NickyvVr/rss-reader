@@ -44,7 +44,7 @@ export default function App() {
   } = useSources();
 
   const {
-    articles, mergeArticles, markRead, markAllRead, updateArticle, deleteBySourceId, clearAll,
+    articles, mergeArticles, markRead, markAllRead, markReadByUrls, updateArticle, deleteBySourceId, clearAll,
   } = useArticles();
 
   const { fetching, lastRefreshed, progress, fetchAll, fetchSingle } = useFeed({
@@ -90,17 +90,17 @@ export default function App() {
     saveSettings(newSettings);
   }, []);
 
-  const handleSyncSources = useCallback((remoteSources, remoteDeletedIds) => {
-    const { removedIds, addedCount } = syncSources(remoteSources, remoteDeletedIds);
+  const handleSyncSources = useCallback((remoteSources, remoteDeletedIds, lastSyncedAt) => {
+    const { removedIds, addedCount, ordered } = syncSources(remoteSources, remoteDeletedIds, lastSyncedAt);
     removedIds.forEach(id => deleteBySourceId(id));
     if (addedCount > 0) {
-      setTimeout(() => fetchAll(sources.filter(s => s.active)), 500);
+      setTimeout(() => fetchAll(ordered.filter(s => s.active)), 500);
     }
-  }, [syncSources, deleteBySourceId, sources, fetchAll]);
+  }, [syncSources, deleteBySourceId, fetchAll]);
 
-  const handleMergeReadIds = useCallback((remoteReadIds) => {
-    markAllRead(remoteReadIds);
-  }, [markAllRead]);
+  const handleMergeReadUrls = useCallback((remoteReadUrls) => {
+    markReadByUrls(remoteReadUrls);
+  }, [markReadByUrls]);
 
   const handleMergeSettings = useCallback((mergedSettings) => {
     setSettings(mergedSettings);
@@ -112,7 +112,7 @@ export default function App() {
     articles,
     settings,
     onSyncSources: handleSyncSources,
-    onMergeReadIds: handleMergeReadIds,
+    onMergeReadUrls: handleMergeReadUrls,
     onMergeSettings: handleMergeSettings,
     onSaveSettings: handleSaveSettings,
   });

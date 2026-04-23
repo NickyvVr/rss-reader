@@ -113,7 +113,7 @@ export function useSources() {
   }, [persist]);
 
   // Full sync merge: handles deletions, updates, additions, and ordering
-  const syncSources = useCallback((remoteSources, remoteDeletedIds = []) => {
+  const syncSources = useCallback((remoteSources, remoteDeletedIds = [], lastSyncedAt = null) => {
     const existing = getSources();
     const localDeletedIds = getDeletedSourceIds();
 
@@ -153,7 +153,13 @@ export function useSources() {
     // Order: follow remote order first, then local-only sources at end
     const remoteActive = remoteSources.filter(rs => !allDeletedSet.has(rs.id));
     const remoteUrlSet = new Set(remoteActive.map(rs => rs.xmlUrl));
-    const localOnly = surviving.filter(s => !remoteUrlSet.has(s.xmlUrl));
+    // Only keep local-only sources added AFTER last sync — sources present before the
+    // last sync but absent from remote have been deleted remotely and should be pruned.
+    const localOnly = surviving.filter(s => {
+      if (remoteUrlSet.has(s.xmlUrl)) return false;
+      if (!lastSyncedAt) return true;
+      return new Date(s.addedAt) > new Date(lastSyncedAt);
+    });
     const ordered = [
       ...remoteActive.map(rs => localByUrl.get(rs.xmlUrl)).filter(Boolean),
       ...localOnly,
@@ -161,7 +167,7 @@ export function useSources() {
 
     persist(ordered);
     const addedCount = ordered.filter(s => !existing.some(e => e.xmlUrl === s.xmlUrl)).length;
-    return { removedIds, addedCount };
+    return { removedIds, addedCount, ordered };
   }, [persist]);
 
   const clearSources = useCallback(() => {

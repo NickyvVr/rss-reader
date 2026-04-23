@@ -29,6 +29,18 @@ export async function validatePat(pat) {
   const res = await fetch(`${GH_API}/user`, { headers: headers(pat) });
   if (res.status === 401) throw new GistApiError(401, 'Invalid or expired GitHub token');
   await checkResponse(res);
+
+  // Classic tokens include X-OAuth-Scopes; check for gist early so the error
+  // surfaces at connect time rather than silently on the first sync.
+  const scopeHeader = res.headers.get('X-OAuth-Scopes');
+  if (scopeHeader !== null) {
+    const scopes = scopeHeader.split(',').map(s => s.trim());
+    if (!scopes.includes('gist')) {
+      throw new GistApiError(403, 'Token is missing the "gist" scope — regenerate it with gist access enabled');
+    }
+  }
+  // Fine-grained tokens don't expose scopes in headers; let the first API call surface any permission error.
+
   const data = await res.json();
   return data.login;
 }

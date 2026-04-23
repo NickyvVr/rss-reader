@@ -16,7 +16,7 @@ export const SYNC_STATUS = {
 function friendlySyncError(err) {
   if (err instanceof GistApiError) {
     if (err.status === 401) return 'Invalid or expired GitHub token';
-    if (err.status === 403) return 'Token lacks gist permission';
+    if (err.status === 403) return err.message || 'Token lacks gist permission — regenerate with the gist scope';
     if (err.status === 404) return 'Sync gist not found — re-link in Settings';
     if (err.status >= 500) return 'GitHub is temporarily unavailable';
     return err.message;

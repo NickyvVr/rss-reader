@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'Add Read Later, feed URL discovery, and favicon utility *)",
+      "Bash(git push *)"
+    ]
+  }
+}

@@ -43,6 +43,7 @@ export function useArticles() {
         contentSnippet: raw.contentSnippet || '',
         isRead: false,
         readAt: null,
+        isSaved: false,
         shortSummary: null,
         longSummary: null,
         fetchedAt: now,
@@ -91,6 +92,25 @@ export function useArticles() {
     });
   }, []);
 
+  const toggleSaved = useCallback(id => {
+    setArticles(prev => {
+      const updated = prev.map(a => a.id === id ? { ...a, isSaved: !a.isSaved } : a);
+      saveArticles(updated);
+      return updated;
+    });
+  }, []);
+
+  const markSavedByUrls = useCallback(urls => {
+    setArticles(prev => {
+      const urlSet = new Set(urls);
+      const updated = prev.map(a =>
+        urlSet.has(a.url) ? { ...a, isSaved: true } : a
+      );
+      saveArticles(updated);
+      return updated;
+    });
+  }, []);
+
   const updateArticle = useCallback((id, changes) => {
     setArticles(prev => {
       const updated = prev.map(a => a.id === id ? { ...a, ...changes } : a);
@@ -118,6 +138,8 @@ export function useArticles() {
     markRead,
     markAllRead,
     markReadByUrls,
+    toggleSaved,
+    markSavedByUrls,
     updateArticle,
     deleteBySourceId,
     clearAll,

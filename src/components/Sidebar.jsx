@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
+import { getFaviconUrl } from '../utils/favicon';
 
 function sortedCategories(sources, sourceSort, categoryOrder) {
   const all = [...new Set(sources.map(s => s.category || ''))];
   if (sourceSort === 'alpha') return all.sort((a, b) => a.localeCompare(b));
-  // custom: stored order first, then any new ones alphabetically
   return [
     ...categoryOrder.filter(c => all.includes(c)),
     ...all.filter(c => !categoryOrder.includes(c)).sort((a, b) => a.localeCompare(b)),
@@ -13,11 +13,12 @@ function sortedCategories(sources, sourceSort, categoryOrder) {
 function sortedSourcesForCat(sources, cat, sourceSort) {
   const list = sources.filter(s => (s.category || '') === cat);
   if (sourceSort === 'alpha') return [...list].sort((a, b) => a.title.localeCompare(b.title));
-  return list; // custom: array insertion order
+  return list;
 }
 
 export function Sidebar({ sources, articles, currentView, onViewChange, collapsed, onToggle, sourceSort = 'alpha', categoryOrder = [] }) {
   const unreadAll = useMemo(() => articles.filter(a => !a.isRead).length, [articles]);
+  const savedCount = useMemo(() => articles.filter(a => a.isSaved).length, [articles]);
 
   const orderedCats = useMemo(
     () => sortedCategories(sources, sourceSort, categoryOrder),
@@ -101,6 +102,7 @@ export function Sidebar({ sources, articles, currentView, onViewChange, collapse
       <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
         {navItem('unread', 'All Unread', unreadAll)}
         {navItem('all', 'All Articles', 0)}
+        {navItem('saved', 'Saved', savedCount)}
 
         <div className="pt-4 pb-1 px-3">
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Feeds</span>
@@ -132,6 +134,7 @@ export function Sidebar({ sources, articles, currentView, onViewChange, collapse
                 const view = `source:${source.id}`;
                 const unreadCount = sourceUnread[source.id] || 0;
                 const active = currentView === view;
+                const faviconUrl = getFaviconUrl(source);
                 return (
                   <button
                     key={source.id}
@@ -145,9 +148,9 @@ export function Sidebar({ sources, articles, currentView, onViewChange, collapse
                           : 'text-gray-600 hover:text-gray-400 hover:bg-gray-800'
                       }`}
                   >
-                    {source.htmlUrl && (
+                    {faviconUrl && (
                       <img
-                        src={`${source.htmlUrl.replace(/\/$/, '')}/favicon.ico`}
+                        src={faviconUrl}
                         className="w-3.5 h-3.5 rounded-sm shrink-0"
                         onError={e => { e.target.style.display = 'none'; }}
                         alt=""

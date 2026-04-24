@@ -1,14 +1,13 @@
 import { useState } from 'react';
 import { formatDistanceToNow } from '../utils/dateHelper';
 import { ShareButtons } from './ShareButtons';
+import { getFaviconUrl } from '../utils/favicon';
 
-export function ArticleCard({ article, source, onMarkRead }) {
+export function ArticleCard({ article, source, onMarkRead, onToggleSaved }) {
   const [expanded, setExpanded] = useState(true);
 
   const sourceName = source?.title || 'Unknown Source';
-  const faviconUrl = source?.htmlUrl
-    ? `${source.htmlUrl.replace(/\/$/, '')}/favicon.ico`
-    : null;
+  const faviconUrl = getFaviconUrl(source);
 
   function markReadIfUnread() {
     if (!article.isRead) onMarkRead(article.id, true);
@@ -44,6 +43,20 @@ export function ArticleCard({ article, source, onMarkRead }) {
 
         {/* Actions */}
         <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={() => onToggleSaved?.(article.id)}
+            className={`p-1.5 rounded-md transition-colors ${
+              article.isSaved
+                ? 'text-amber-400 hover:text-gray-400'
+                : 'text-gray-500 hover:text-amber-400'
+            }`}
+            title={article.isSaved ? 'Remove from saved' : 'Save for later'}
+          >
+            <svg className="w-4 h-4" fill={article.isSaved ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+            </svg>
+          </button>
+
           <button
             onClick={() => onMarkRead(article.id, !article.isRead)}
             className={`p-1.5 rounded-md transition-colors ${

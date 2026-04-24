@@ -44,7 +44,8 @@ export default function App() {
   } = useSources();
 
   const {
-    articles, mergeArticles, markRead, markAllRead, markReadByUrls, updateArticle, deleteBySourceId, clearAll,
+    articles, mergeArticles, markRead, markAllRead, markReadByUrls,
+    toggleSaved, markSavedByUrls, updateArticle, deleteBySourceId, clearAll,
   } = useArticles();
 
   const { fetching, lastRefreshed, progress, fetchAll, fetchSingle } = useFeed({
@@ -98,6 +99,10 @@ export default function App() {
     markReadByUrls(remoteReadUrls);
   }, [markReadByUrls]);
 
+  const handleMergeSavedUrls = useCallback((urls) => {
+    markSavedByUrls(urls);
+  }, [markSavedByUrls]);
+
   const handleMergeSettings = useCallback((mergedSettings) => {
     setSettings(mergedSettings);
     saveSettings(mergedSettings);
@@ -109,6 +114,7 @@ export default function App() {
     settings,
     onSyncSources: handleSyncSources,
     onMergeReadUrls: handleMergeReadUrls,
+    onMergeSavedUrls: handleMergeSavedUrls,
     onMergeSettings: handleMergeSettings,
     onSaveSettings: handleSaveSettings,
   });
@@ -119,6 +125,10 @@ export default function App() {
     () => articles.filter(a => a.isRead).length,
     [articles]
   );
+  const savedFingerprint = useMemo(
+    () => articles.filter(a => a.isSaved).length,
+    [articles]
+  );
   useEffect(() => {
     if (!hasMounted.current) return;
     triggerSync();
@@ -127,6 +137,10 @@ export default function App() {
     if (!hasMounted.current) return;
     triggerSync();
   }, [readFingerprint]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!hasMounted.current) return;
+    triggerSync();
+  }, [savedFingerprint]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { hasMounted.current = true; }, []);
 
   const handleResetAndPull = useCallback(async () => {
@@ -147,7 +161,9 @@ export default function App() {
   const filteredArticles = useMemo(() => {
     let base = [...articles];
 
-    if (view.startsWith('source:')) {
+    if (view === 'saved') {
+      base = base.filter(a => a.isSaved);
+    } else if (view.startsWith('source:')) {
       const sourceId = view.replace('source:', '');
       base = base.filter(a => a.sourceId === sourceId);
     } else if (view.startsWith('cat:')) {
@@ -156,7 +172,7 @@ export default function App() {
       base = base.filter(a => sourceIds.has(a.sourceId));
     }
 
-    if (viewMode === 'unread') {
+    if (view !== 'saved' && viewMode === 'unread') {
       base = base.filter(a => !a.isRead || justReadIds.current.has(a.id));
     }
 
@@ -191,6 +207,7 @@ export default function App() {
   function getViewTitle() {
     if (view === 'unread') return 'All Unread';
     if (view === 'all') return 'All Articles';
+    if (view === 'saved') return 'Saved';
     if (view.startsWith('source:')) {
       const src = sources.find(s => s.id === view.replace('source:', ''));
       return src?.title || 'Feed';
@@ -362,25 +379,36 @@ export default function App() {
                       article={article}
                       source={source}
                       onMarkRead={handleMarkRead}
+                      onToggleSaved={toggleSaved}
                     />
                   );
                 })}
               </div>
-            ) : sources.length > 0 ? (
+            ) : sources.length > 0 || view === 'saved' ? (
               <div className="text-center py-16 text-gray-500">
-                <p className="text-xl mb-2">
-                  {viewMode === 'unread' ? '🎉' : '🔍'}
-                </p>
-                <p className="font-medium text-gray-400">
-                  {viewMode === 'unread' ? 'All caught up!' : 'No articles found'}
-                </p>
-                {viewMode === 'unread' && (
-                  <button
-                    onClick={() => setViewMode('all')}
-                    className="text-sm text-indigo-400 hover:underline mt-2 block mx-auto"
-                  >
-                    View all articles
-                  </button>
+                {view === 'saved' ? (
+                  <>
+                    <p className="text-xl mb-2">🔖</p>
+                    <p className="font-medium text-gray-400">No saved articles yet</p>
+                    <p className="text-sm mt-1">Click the bookmark icon on any article to save it.</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xl mb-2">
+                      {viewMode === 'unread' ? '🎉' : '🔍'}
+                    </p>
+                    <p className="font-medium text-gray-400">
+                      {viewMode === 'unread' ? 'All caught up!' : 'No articles found'}
+                    </p>
+                    {viewMode === 'unread' && (
+                      <button
+                        onClick={() => setViewMode('all')}
+                        className="text-sm text-indigo-400 hover:underline mt-2 block mx-auto"
+                      >
+                        View all articles
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             ) : null}

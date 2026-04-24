@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { toast } from './Toast';
+import { discoverFeed } from '../utils/feedDiscovery';
 
 export function AddSourceForm({ sources, onAddSource, onFetchSingle, onClose }) {
   const [feedUrl, setFeedUrl] = useState('');
@@ -16,13 +17,32 @@ export function AddSourceForm({ sources, onAddSource, onFetchSingle, onClose }) 
     setError('');
     setValidating(true);
 
+    let resolvedUrl = feedUrl.trim();
+    let resolvedTitle = name.trim();
+    let resolvedHtmlUrl = '';
+
+    try {
+      const found = await discoverFeed(feedUrl.trim());
+      resolvedUrl = found.feedUrl;
+      resolvedHtmlUrl = found.htmlUrl || '';
+      if (!resolvedTitle && found.title) {
+        resolvedTitle = found.title;
+        setName(found.title);
+      }
+      if (resolvedUrl !== feedUrl.trim()) setFeedUrl(resolvedUrl);
+    } catch (err) {
+      setError(err.message);
+      setValidating(false);
+      return;
+    }
+
     const cat = category === '__new__' ? newCat.trim() : category;
 
     try {
       const result = onAddSource({
-        title: name.trim() || feedUrl.trim(),
-        xmlUrl: feedUrl.trim(),
-        htmlUrl: '',
+        title: resolvedTitle || resolvedUrl,
+        xmlUrl: resolvedUrl,
+        htmlUrl: resolvedHtmlUrl,
         category: cat,
       });
 
@@ -32,7 +52,6 @@ export function AddSourceForm({ sources, onAddSource, onFetchSingle, onClose }) 
         return;
       }
 
-      // Validate by fetching
       const fetchResult = await onFetchSingle(result.source);
       if (fetchResult.error) {
         setError(`Feed fetch failed: ${fetchResult.error}. Source was saved but may not work.`);
@@ -61,14 +80,16 @@ export function AddSourceForm({ sources, onAddSource, onFetchSingle, onClose }) 
 
         <div className="p-6 space-y-4">
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Feed URL *</label>
+            <label className="block text-sm text-gray-400 mb-1">Website or feed URL *</label>
             <input
               type="url"
               value={feedUrl}
               onChange={e => setFeedUrl(e.target.value)}
-              placeholder="https://example.com/feed.xml"
+              onKeyDown={e => e.key === 'Enter' && handleSave()}
+              placeholder="https://example.com or https://example.com/feed.xml"
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
             />
+            <p className="text-xs text-gray-600 mt-1">Paste a site URL and the feed will be auto-detected.</p>
           </div>
 
           <div>
@@ -119,7 +140,7 @@ export function AddSourceForm({ sources, onAddSource, onFetchSingle, onClose }) 
               disabled={validating || !feedUrl.trim()}
               className="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium py-2 px-4 rounded-lg transition-colors"
             >
-              {validating ? 'Validating…' : 'Add Feed'}
+              {validating ? 'Detecting feed…' : 'Add Feed'}
             </button>
             <button
               onClick={onClose}

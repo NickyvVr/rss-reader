@@ -31,6 +31,7 @@ export function useSync({
   settings,
   onSyncSources,
   onMergeReadUrls,
+  onMergeSavedUrls,
   onMergeSettings,
   onSaveSettings,
 }) {
@@ -44,7 +45,7 @@ export function useSync({
 
   // Keep a ref to latest values so async callbacks don't close over stale state
   const ref = useRef({});
-  ref.current = { sources, articles, settings, onSyncSources, onMergeReadUrls, onMergeSettings, onSaveSettings };
+  ref.current = { sources, articles, settings, onSyncSources, onMergeReadUrls, onMergeSavedUrls, onMergeSettings, onSaveSettings };
 
   useEffect(() => {
     isMounted.current = true;
@@ -58,6 +59,7 @@ export function useSync({
     const { sources, articles, settings } = ref.current;
     const cleanSources = sources.map(({ lastError: _e, lastFetchedAt: _f, ...rest }) => rest);
     const readUrls = articles.filter(a => a.isRead).map(a => a.url);
+    const savedUrls = articles.filter(a => a.isSaved).map(a => a.url);
     const deletedSourceIds = getDeletedSourceIds();
     const { syncPat: _p, syncGistId: _g, lastSyncedAt: _s, ...syncableSettings } = settings;
     return {
@@ -66,12 +68,13 @@ export function useSync({
       sources: cleanSources,
       deletedSourceIds,
       readUrls,
+      savedUrls,
       settings: syncableSettings,
     };
   }
 
   const pullAndMerge = useCallback(async () => {
-    const { settings, articles, onSyncSources, onMergeReadUrls, onMergeSettings, onSaveSettings } = ref.current;
+    const { settings, articles, onSyncSources, onMergeReadUrls, onMergeSavedUrls, onMergeSettings, onSaveSettings } = ref.current;
     if (!settings.syncPat || !settings.syncGistId) return;
 
     setSyncStatus(SYNC_STATUS.PULLING);
@@ -89,6 +92,12 @@ export function useSync({
       const remoteReadUrls = remote.readUrls ?? [];
       const newReadUrls = remoteReadUrls.filter(u => u && !localReadUrls.has(u));
       if (newReadUrls.length > 0) onMergeReadUrls(newReadUrls);
+
+      // Merge saved URLs (union — once saved, stays saved everywhere)
+      const localSavedUrls = new Set(articles.filter(a => a.isSaved).map(a => a.url));
+      const remoteSavedUrls = remote.savedUrls ?? [];
+      const newSavedUrls = remoteSavedUrls.filter(u => u && !localSavedUrls.has(u));
+      if (newSavedUrls.length > 0) onMergeSavedUrls(newSavedUrls);
 
       // Merge settings (last-write-wins by syncedAt)
       const { lastSyncedAt: prevSync } = settings;

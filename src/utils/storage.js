@@ -43,6 +43,9 @@ export function saveArticles(articles) {
     const serialized = JSON.stringify(articles);
     if (serialized.length > 4_000_000) {
       const sorted = [...articles].sort((a, b) => {
+        // saved articles are never evicted
+        if (a.isSaved && !b.isSaved) return 1;
+        if (!a.isSaved && b.isSaved) return -1;
         if (a.isRead && !b.isRead) return -1;
         if (!a.isRead && b.isRead) return 1;
         return new Date(a.fetchedAt) - new Date(b.fetchedAt);
